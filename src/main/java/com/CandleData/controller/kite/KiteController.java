@@ -19,8 +19,9 @@ public class KiteController {
     private final KiteService kiteService; // Injection fixed
 
     @GetMapping("/kite/login")
-    public ResponseEntity<String> loginUrl() {
-        return ResponseEntity.ok(kiteService.getLoginUrl());
+    public String loginUrl() {
+        log.info("Generating Kite login URL");
+        return kiteService.getLoginUrl();
     }
 
     @PostMapping("/access-token")
