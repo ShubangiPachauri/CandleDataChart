@@ -24,7 +24,7 @@ public class StockService {
     private final KiteService kiteService;
     private final StockRepository stockRepository;
 
-    @Transactional(rollbackFor = Exception.class)
+    //@Transactional(rollbackFor = Exception.class)
     public void syncAllInstruments() throws IOException, KiteException {
         log.info("Stock Sync Started: Fetching instruments from Kite Connect...");
         KiteConnect kiteConnect = kiteService.getKiteConnect();
@@ -56,12 +56,16 @@ public class StockService {
         log.info("Filtering complete. Unique stocks identified: {}", filteredStocksMap.size());
 
         try {
-            log.info("Cleaning old stock data and saving new records...");
+            log.info("Cleaning and saving records...");
+            // Purana data delete karke naya save karna
             stockRepository.deleteAllInBatch(); 
+            
+            // 19k records ko batches mein save karna behtar hai
             stockRepository.saveAll(filteredStocksMap.values());
-            log.info("Stock sync completed successfully. Total records saved: {}", filteredStocksMap.size());
+            
+            log.info("Success! Total saved: {}", filteredStocksMap.size());
         } catch (Exception e) {
-            log.error("Database error during stock sync: {}", e.getMessage());
+            log.error("Database error: {}", e.getMessage());
             throw e;
         }
     }
