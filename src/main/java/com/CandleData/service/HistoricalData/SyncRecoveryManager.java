@@ -20,7 +20,6 @@ public class SyncRecoveryManager {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationStart() throws KiteException {
         try {
-            // Wait for DB connections and Token to be ready
             log.info("Startup Recovery: Waiting 15 seconds for system to stabilize...");
             Thread.sleep(15000); 
             

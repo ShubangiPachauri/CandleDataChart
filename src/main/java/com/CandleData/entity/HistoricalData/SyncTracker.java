@@ -27,7 +27,7 @@ public class SyncTracker {
     private String tradingSymbol;
     private Long instrumentToken;
     
-    @Column(name = "`interval` ") 
+    @Column(name = "`interval`") 
     private String interval;// 5minute, 15minute, etc.
     
     private String lastFetchedTimestamp; // Last successful candle time
