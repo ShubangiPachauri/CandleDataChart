@@ -37,7 +37,7 @@ public class HistoricalDataProcessor {
         }
     	
         String symbol = stock.getTradingSymbol();
-        String token = String.valueOf(stock.getInstrumentToken());
+        //String token = String.valueOf(stock.getInstrumentToken());
         
         SyncTracker tracker = trackerRepository
                 .findByInstrumentTokenAndInterval(stock.getInstrumentToken(), interval)
@@ -53,8 +53,16 @@ public class HistoricalDataProcessor {
             return;
         }
 
-        Date fromDate = determineStartDate(tracker);
+        Date fromDate = determineStartDate(tracker, interval);
         Date toDate = determineToDate();
+        
+     // FIX: DAY / WEEK / MONTH interval ke liye TIME strip karna
+        if ("day".equals(interval) || "week".equals(interval) || "month".equals(interval)) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            fromDate = sdf.parse(sdf.format(fromDate));
+            toDate   = sdf.parse(sdf.format(toDate));
+        }
+
 
         // 2. Logic Check: Market Hours Guard
         if (fromDate.after(toDate)) {
@@ -91,16 +99,13 @@ public class HistoricalDataProcessor {
 
     private Date determineToDate() {
         LocalTime now = LocalTime.now();
-        // Agar abhi 3:30 PM (15:30) nahi baje hain
         if (now.isBefore(LocalTime.of(15, 30))) {
-            // Toh hum sirf KAL sham 3:30 tak ka data mang sakte hain
             java.util.Calendar cal = java.util.Calendar.getInstance();
             cal.add(java.util.Calendar.DATE, -1); // Kal ki date
             cal.set(java.util.Calendar.HOUR_OF_DAY, 15);
             cal.set(java.util.Calendar.MINUTE, 30);
             return cal.getTime();
         } else {
-            // Agar 3:30 PM beet chuke hain, toh abhi (current time) tak ka data mang lo
             return new Date();
         }
     }
@@ -111,16 +116,37 @@ public class HistoricalDataProcessor {
                "SUCCESS".equals(tracker.getStatus());
     }
 
-    private Date determineStartDate(SyncTracker tracker) throws Exception {
+    private Date determineStartDate(SyncTracker tracker , String interval) throws Exception {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        
         if (tracker.getLastFetchedTimestamp() != null) {
         	Date lastDate = sdf.parse(tracker.getLastFetchedTimestamp());
         	return new Date(lastDate.getTime() + 1000);
-        }
-        // Agar ekdum naya stock hai, toh aaj subah 9:15 se start
-        String todayStart = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " 09:15:00";
-        return sdf.parse(todayStart);
+        }       
+        String start;
+        switch (interval) {
+            case "5minute" -> start = LocalDate.now().minusDays(60) + " 09:15:00";
+            case "15minute" -> start = LocalDate.now().minusDays(200) + " 09:15:00";
+            case "60minute" -> start = LocalDate.now().minusDays(400) + " 09:15:00";
+            case "day" -> start = LocalDate.now().minusYears(5) + " 09:15:00";   
+            case "week" -> start = LocalDate.now().minusYears(5) + " 09:15:00";  
+//            case "month" -> {
+//                LocalDate startMonth = LocalDate.now().minusYears(2).withDayOfMonth(1); // 5 saal pehle ka 1st
+//                LocalDate endMonth = LocalDate.now().minusMonths(1).withDayOfMonth(1);   // last month ka start
+//                start = startMonth + " 09:15:00";
+                // agar API me alag end date pass karna hai:
+                // endDate = endMonth + " 15:30:00";  // 15:30 for NSE market close
+//            }
+
+
+            default -> start = "2024-01-01 09:15:00";
     }
+        return sdf.parse(start);
+        // Agar ekdum naya stock hai, toh aaj subah 9:15 se start
+        //String todayStart = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " 09:15:00";
+        //return sdf.parse(todayStart);
+    }
+    
 
     private List<HistoricalData> mapToEntity(List<com.zerodhatech.models.HistoricalData> list, Stock stock) {
         return list.stream().map(d -> HistoricalData.builder()

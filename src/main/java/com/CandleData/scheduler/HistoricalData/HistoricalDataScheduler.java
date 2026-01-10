@@ -38,8 +38,16 @@ public class HistoricalDataScheduler {
         log.info("STARTING HISTORICAL DATA SYNC | Time: {}", new Date());
         log.info("-----------------------------------------------------");
 
-        List<Stock> stocks = stockRepository.findAll();
-        String[] intervals = {"5minute", "15minute", "60minute", "day"};
+        List<Stock> stocks = stockRepository.findAll()
+                .stream()
+                .filter(s ->
+                        "TCS".equalsIgnoreCase(s.getTradingSymbol()) ||
+                        "RELIANCE".equalsIgnoreCase(s.getTradingSymbol())
+                )
+                .toList();
+
+    
+        String[] intervals = {"5minute", "15minute", "60minute", "day", "week"};
         String monthYear = new SimpleDateFormat("MMM_yyyy").format(new Date()).toUpperCase();
 
         for (String interval : intervals) {
