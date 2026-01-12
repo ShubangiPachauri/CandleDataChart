@@ -16,9 +16,11 @@ import org.springframework.stereotype.Component;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -58,31 +60,51 @@ public class HistoricalDataScheduler {
             log.info("Interval [{}] started", interval);
             List<SyncTracker> tracker = trackerRepository
                     .findByInterval(interval);
-            // Create Map from this List = key = instrumentToken, value = SyncTracker
-            // Map<String, SyncTracker> map
             
-            Map<String, SyncTracker> map = createTrackerMapfromList(tracker);
+            Map<Long, SyncTracker> map = createTrackerMapfromList(tracker);
             
             for (int i = 0; i < stocks.size(); i++) {
                 Stock stock = stocks.get(i);
                 try {
-                    // Har 50 stock ke baad ek progress update
                     if (i % 50 == 0) log.info("Progress: {}/{} stocks done for {}", i, stocks.size(), interval);
                     
                     processor.processStockData(stock, interval, tableName, map.get(stock.getInstrumentToken()));
                     Thread.sleep(350); 
                 } catch (Exception e) {
-                    // Log already handled in processor
+                	 log.error("Error processing stock [{}] | interval [{}] | token [{}]",
+                             stock.getTradingSymbol(),
+                             interval,
+                             stock.getInstrumentToken(),
+                             e
+                     );
+                	 try {
+                	        SyncTracker failedTracker = map.get(stock.getInstrumentToken());
+                	        if (failedTracker != null) {
+                	            failedTracker.setStatus("FAILED");
+                	            failedTracker.setLastRunAt(java.time.LocalDateTime.now());
+                	            trackerRepository.save(failedTracker);
+                	        }
+                	    } catch (Exception ex) {
+                	        log.error("Failed to update FAILED status for {}", stock.getTradingSymbol(), ex);
+                	    }
                 }
             }
         }
         log.info("Historical data sync completed at {}", new Date());
     }
     
-    private Map<String, SyncTracker> createTrackerMapfromList(List<SyncTracker> tracker) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    private Map<Long, SyncTracker> createTrackerMapfromList(List<SyncTracker> trackerList) {
+    	if (trackerList == null || trackerList.isEmpty()) {
+            return new HashMap<>();
+        }
+    	return trackerList.stream()
+                .collect(Collectors.toMap(
+                		SyncTracker::getInstrumentToken, 
+                    tracker -> tracker,                                      
+                    (existing, replacement) -> existing                      
+                ));
+    }
+    
 	private boolean isTokenValid() {
         try {
             return kiteService.getKiteConnect().getAccessToken() != null;
