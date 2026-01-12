@@ -5,6 +5,8 @@ import com.CandleData.entity.HistoricalData.SyncTracker;
 import com.CandleData.entity.stock.Stock;
 import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
 import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
+import static com.CandleData.service.AppConstant.MARKET_OPEN_TIME;
+import static com.CandleData.service.AppConstant.FIVE_MINUTE;
 import com.CandleData.service.kite.KiteService;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 
@@ -21,6 +23,7 @@ import java.time.LocalTime;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -127,26 +130,18 @@ public class HistoricalDataProcessor {
         	Date lastDate = sdf.parse(tracker.getLastFetchedTimestamp());
         	return new Date(lastDate.getTime() + 1000);
         }       
+        // Agar ekdum naya stock hai,
         String start;
+        interval = interval.toLowerCase();
         switch (interval) {
-            case "5minute" -> start = LocalDate.now().minusDays(60) + " 09:15:00";
-            case "15minute" -> start = LocalDate.now().minusDays(200) + " 09:15:00";
-            case "60minute" -> start = LocalDate.now().minusDays(400) + " 09:15:00";
-            case "day" -> start = LocalDate.now().minusYears(5) + " 09:15:00";   
-            case "week" -> start = LocalDate.now().minusYears(5) + " 09:15:00";  
-//            case "month" -> {
-//                LocalDate startMonth = LocalDate.now().minusYears(2).withDayOfMonth(1); // 5 saal pehle ka 1st
-//                LocalDate endMonth = LocalDate.now().minusMonths(1).withDayOfMonth(1);   // last month ka start
-//                start = startMonth + " 09:15:00";
-                // agar API me alag end date pass karna hai:
-                // endDate = endMonth + " 15:30:00";  // 15:30 for NSE market close
-//            }
-
-
+            case FIVE_MINUTE -> start = LocalDate.now().minusDays(60) + MARKET_OPEN_TIME;
+            case "15minute" -> start = LocalDate.now().minusDays(200) + MARKET_OPEN_TIME;
+            case "60minute" -> start = LocalDate.now().minusDays(400) + MARKET_OPEN_TIME;
+            case "day" -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;   
+            case "week" -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;
             default -> start = "2024-01-01 09:15:00";
     }
         return sdf.parse(start);
-        // Agar ekdum naya stock hai, toh aaj subah 9:15 se start
         //String todayStart = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " 09:15:00";
         //return sdf.parse(todayStart);
     }
