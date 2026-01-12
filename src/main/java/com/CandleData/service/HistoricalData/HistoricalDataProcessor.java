@@ -32,7 +32,7 @@ public class HistoricalDataProcessor {
     @Transactional
     public void processStockData(Stock stock, String interval, String tableName) throws Exception, KiteException {
     	if (stock == null || stock.getInstrumentToken() == null || stock.getTradingSymbol() == null) {
-            log.error(">>> [SKIP] Found null stock or token in database!");
+            log.error("[SKIP] Found null stock or token in database!");
             return;
         }
     	
@@ -66,8 +66,7 @@ public class HistoricalDataProcessor {
 
         // 2. Logic Check: Market Hours Guard
         if (fromDate.after(toDate)) {
-            log.info(">>> [AWAIT] {} ({}) - Previous data complete. Waiting for market close (15:30) for new data.", symbol, interval);
-            return;
+           return;
         }
 
         log.info(">>> [FETCHING] {} ({}) from {} to {}", symbol, interval, fromDate, toDate);
@@ -88,9 +87,7 @@ public class HistoricalDataProcessor {
                 trackerRepository.save(tracker);
                 
                 log.info(">>> [SUCCESS] {} ({}): {} records saved to {}", symbol, interval, entities.size(), tableName);
-            } else {
-                log.warn(">>> [NO DATA] No new data found for {} ({}) in given range.", symbol, interval);
-            }
+            } 
         } catch (Exception e) {
             log.error(">>> [ERROR] Failed to fetch data for {} ({}): {}", symbol, interval, e.getMessage());
             throw e; // Rethrow for scheduler catch block

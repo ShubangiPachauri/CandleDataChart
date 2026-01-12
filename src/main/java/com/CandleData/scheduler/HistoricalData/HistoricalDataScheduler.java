@@ -27,17 +27,13 @@ public class HistoricalDataScheduler {
 
     @Scheduled(cron = "0 30 15 * * MON-FRI")
     public void runDailySync() throws KiteException {
-        if (!isTokenValid()) {
-            log.error("****************************************************");
-            log.error("CRITICAL: Kite Token missing! Please login first.");
-            log.error("****************************************************");
+        if (!isTokenValid()) {           
+            log.error("Kite token missing. Login required.");
             return;
         }
 
-        log.info("-----------------------------------------------------");
-        log.info("STARTING HISTORICAL DATA SYNC | Time: {}", new Date());
-        log.info("-----------------------------------------------------");
-
+        log.info("Historical data sync started at {}", new Date());
+        
         List<Stock> stocks = stockRepository.findAll()
                 .stream()
                 .filter(s ->
@@ -46,7 +42,6 @@ public class HistoricalDataScheduler {
                 )
                 .toList();
 
-    
         String[] intervals = {"5minute", "15minute", "60minute", "day", "week"};
         String monthYear = new SimpleDateFormat("MMM_yyyy").format(new Date()).toUpperCase();
 
@@ -54,6 +49,8 @@ public class HistoricalDataScheduler {
             log.info("Processing Interval: [{}]", interval);
             String tableName = interval + "_HistoricalData_EQ_" + monthYear;
             historicalRepository.createTableIfNotExist(tableName);
+            
+            log.info("Interval [{}] started", interval);
 
             for (int i = 0; i < stocks.size(); i++) {
                 Stock stock = stocks.get(i);
@@ -68,9 +65,7 @@ public class HistoricalDataScheduler {
                 }
             }
         }
-        log.info("-----------------------------------------------------");
-        log.info("SYNC COMPLETED SUCCESSFULLY AT {}", new Date());
-        log.info("-----------------------------------------------------");
+        log.info("Historical data sync completed at {}", new Date());
     }
     private boolean isTokenValid() {
         try {
