@@ -6,6 +6,8 @@ import com.CandleData.entity.stock.Stock;
 import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
 import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
 import static com.CandleData.service.AppConstant.*;
+
+import com.CandleData.service.ErrorCodes;
 import com.CandleData.service.kite.KiteService;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 
@@ -92,6 +94,8 @@ public class HistoricalDataProcessor {
                     .getHistoricalData(fromDate, toDate, String.valueOf(stock.getInstrumentToken()), interval, false, true)
                     .dataArrayList;
 
+            // we don't need to set success if kiteData is null or empty.
+            //Logs - ErrorLogs - for every exception and KiteResponseLogs - while fetching data from Kite
             if (kiteData == null || kiteData.isEmpty()) {
             	
             	tracker.setStatus("SUCCESS");
@@ -122,8 +126,14 @@ public class HistoricalDataProcessor {
                 
                 log.info("[SUCCESS] {} ({}): {} records saved to {}", symbol, interval, entities.size(), tableName);
             
-        }  catch (Exception e) {
+        }  
+        
+        catch (Exception e) {
             log.error(">>> [ERROR] {} ({}) {}", symbol, interval, e.getMessage(), e);
+            errorLog.setErrorCode(ErrorCodes.ERR01.getCode());
+            errorLog.setErrorMessage(ErrorCodes.ERR01.getMessage());
+            ActualFailureMessage(e.getMessage())
+            
             throw e;
         }
     }
@@ -168,13 +178,14 @@ public class HistoricalDataProcessor {
         String start;
         interval = interval.toLowerCase();
         switch (interval) {
-            case FIVE_MINUTE -> start = LocalDate.now().minusDays(100) + MARKET_OPEN_TIME;
-            case FIFTEEN_MINUTE -> start = LocalDate.now().minusDays(200) + MARKET_OPEN_TIME;
+        	case MINUTE -> start = LocalDate.now().minusDays(70) + MARKET_OPEN_TIME;
+            case FIVE_MINUTE -> start = LocalDate.now().minusDays(200) + MARKET_OPEN_TIME;
+            case FIFTEEN_MINUTE -> start = LocalDate.now().minusDays(250) + MARKET_OPEN_TIME;
             case SIXTY_MINUTE-> start = LocalDate.now().minusDays(400) + MARKET_OPEN_TIME;
             case DAY -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;   
             case WEEK -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;
             default ->   start = defaultStartDate; 
-    }
+        }
         return dbFormat.parse(start);
         //String todayStart = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + " 09:15:00";
         //return sdf.parse(todayStart);

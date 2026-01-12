@@ -1,26 +1,28 @@
 package com.CandleData.scheduler.HistoricalData;
 
-import com.CandleData.entity.HistoricalData.SyncTracker;
-import com.CandleData.entity.stock.Stock;
-import com.CandleData.repository.stock.StockRepository;
-import com.CandleData.service.HistoricalData.HistoricalDataProcessor;
-import com.CandleData.service.kite.KiteService;
-import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
-import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
-import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import static com.CandleData.service.AppConstant.MINUTE;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import com.CandleData.entity.HistoricalData.SyncTracker;
+import com.CandleData.entity.stock.Stock;
+import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
+import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
+import com.CandleData.repository.stock.StockRepository;
+import com.CandleData.service.HistoricalData.HistoricalDataProcessor;
+import com.CandleData.service.kite.KiteService;
+import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -49,7 +51,7 @@ public class HistoricalDataScheduler {
                 )
                 .toList();
 
-        String[] intervals = {"5minute", "15minute", "60minute", "day", "week"};
+        String[] intervals = {MINUTE,"5minute", "15minute", "60minute", "day", "week"};
         String monthYear = new SimpleDateFormat("MMM_yyyy").format(new Date()).toUpperCase();
 
         for (String interval : intervals) {
