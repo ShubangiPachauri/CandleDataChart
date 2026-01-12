@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -30,7 +31,7 @@ public class HistoricalDataProcessor {
     private final SyncTrackerRepository trackerRepository;
 
     @Transactional
-    public void processStockData(Stock stock, String interval, String tableName) throws Exception, KiteException {
+    public void processStockData(Stock stock, String interval, String tableName, SyncTracker tracker) throws Exception, KiteException {
     	if (stock == null || stock.getInstrumentToken() == null || stock.getTradingSymbol() == null) {
             log.error("[SKIP] Found null stock or token in database!");
             return;
@@ -38,14 +39,20 @@ public class HistoricalDataProcessor {
     	
         String symbol = stock.getTradingSymbol();
         //String token = String.valueOf(stock.getInstrumentToken());
-        
-        SyncTracker tracker = trackerRepository
-                .findByInstrumentTokenAndInterval(stock.getInstrumentToken(), interval)
-                .orElse(SyncTracker.builder()
-                        .tradingSymbol(symbol)
-                        .instrumentToken(stock.getInstrumentToken())
-                        .interval(interval)
-                        .build());
+        if(ObjectUtils.isEmpty(tracker) ) {
+        	tracker = SyncTracker.builder()
+	          .tradingSymbol(symbol)
+	          .instrumentToken(stock.getInstrumentToken())
+	          .interval(interval)
+	          .build();
+        }
+//        SyncTracker tracker = trackerRepository
+//                .findByInstrumentTokenAndInterval(stock.getInstrumentToken(), interval)
+//                .orElse(SyncTracker.builder()
+//                        .tradingSymbol(symbol)
+//                        .instrumentToken(stock.getInstrumentToken())
+//                        .interval(interval)
+//                        .build());
 
         // 1. Skip if already done
         if (isAlreadySyncedToday(tracker)) {
