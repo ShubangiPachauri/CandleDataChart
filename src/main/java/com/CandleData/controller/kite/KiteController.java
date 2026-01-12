@@ -25,7 +25,7 @@ public class KiteController {
     }
 
     @PostMapping("/access-token")
-    public ResponseEntity<?> getAccessToken(@RequestParam String requestToken) {
+    public ResponseEntity<?> getAccessToken(@RequestParam(name="requestToken") String requestToken) {
         try {
             log.info("Generating session for token: {}", requestToken);
             kiteService.generateSession(requestToken);
