@@ -8,6 +8,7 @@ import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
 import static com.CandleData.service.AppConstant.*;
 
 import com.CandleData.service.ErrorCodes;
+import com.CandleData.service.Logs.LogService;
 import com.CandleData.service.kite.KiteService;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 
@@ -33,10 +34,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class HistoricalDataProcessor {
+	
+	 private static final int DB_BATCH_SIZE = 5000;
 
     private final KiteService kiteService;
     private final HistoricalDataRepository historicalRepository;
     private final SyncTrackerRepository trackerRepository;
+    private final LogService logService;
     
     @Value("${historical.default.start-date}")
     private String defaultStartDate;
@@ -44,7 +48,7 @@ public class HistoricalDataProcessor {
     @Transactional
     public void processStockData(Stock stock, String interval, String tableName, SyncTracker tracker) throws Exception, KiteException {
     	if (stock == null || stock.getInstrumentToken() == null || stock.getTradingSymbol() == null) {
-            log.error("[SKIP] Found null stock or token in database!");
+    		logService.logError(ErrorCodes.ERR_VALIDATION, "Stock or Token is null", "Table: " + tableName);
             return;
         }
     	
@@ -66,9 +70,8 @@ public class HistoricalDataProcessor {
 //                        .interval(interval)
 //                        .build());
 
-        // 1. Skip if already done
         if (isAlreadySyncedToday(tracker)) {
-            log.info(">>> [SKIP] {} ({}) already synced for today.", symbol, interval);
+            log.info("[SKIP] {} ({}) already synced for today.", symbol, interval);
             return;
         }
 
@@ -81,8 +84,6 @@ public class HistoricalDataProcessor {
             toDate   = sdf.parse(sdf.format(toDate));
         }
 
-
-        // 2. Logic Check: Market Hours Guard
         if (fromDate.after(toDate)) {
            return;
         }
@@ -93,30 +94,53 @@ public class HistoricalDataProcessor {
             List<com.zerodhatech.models.HistoricalData> kiteData = kiteService.getKiteConnect()
                     .getHistoricalData(fromDate, toDate, String.valueOf(stock.getInstrumentToken()), interval, false, true)
                     .dataArrayList;
-
-            // we don't need to set success if kiteData is null or empty.
-            //Logs - ErrorLogs - for every exception and KiteResponseLogs - while fetching data from Kite
-            if (kiteData == null || kiteData.isEmpty()) {
+             if (kiteData == null || kiteData.isEmpty()) {
             	
-            	tracker.setStatus("SUCCESS");
-            	    tracker.setLastRunAt(LocalDateTime.now());
+//            	tracker.setStatus("SUCCESS");
+//            	    tracker.setLastRunAt(LocalDateTime.now());
+//
+//            	    if (tracker.getLastFetchedTimestamp() == null) {
+//            	        tracker.setLastFetchedTimestamp(
+//            	                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fromDate)
+//            	        );
+//            	    }
+//
+//            	    trackerRepository.save(tracker);
 
-            	    // Prevent infinite refetch
-            	    if (tracker.getLastFetchedTimestamp() == null) {
-            	        tracker.setLastFetchedTimestamp(
-            	                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(fromDate)
-            	        );
-            	    }
-
-            	    trackerRepository.save(tracker);
-
-            	    log.info(">>> [NO DATA] {} ({}) from={} to={}",
-            	            symbol, interval, fromDate, toDate);
-            	    return;
+            	 log.warn("[NO DATA] {} ({}) from={} to={}. Tracker not updated.", symbol, interval, fromDate, toDate);  
+                 logService.logKiteResponse(symbol, stock.getInstrumentToken(), fromDate, toDate, interval, "Empty response from Kite", "NO_DATA");
+             	return;
             	}
-               
-                List<HistoricalData> entities = mapToEntity(kiteData, stock);
-                historicalRepository.saveBatch(tableName, entities);
+             List<HistoricalData> batch = new java.util.ArrayList<>(DB_BATCH_SIZE);
+             int totalSaved = 0;
+
+             for (com.zerodhatech.models.HistoricalData d : kiteData) {
+
+                 batch.add(HistoricalData.builder()
+                         .id(stock.getInstrumentToken() + "_" + d.timeStamp)
+                         .timeStamp(d.timeStamp)
+                         .tradingSymbol(symbol)
+                         .instrumentToken(stock.getInstrumentToken())
+                         .open(d.open)
+                         .high(d.high)
+                         .low(d.low)
+                         .close(d.close)
+                         .volume(d.volume)
+                         .oi(d.oi)
+                         .build());
+
+                 if (batch.size() >= DB_BATCH_SIZE) {
+                     historicalRepository.saveBatch(tableName, batch);
+                     totalSaved += batch.size();
+                     batch.clear();
+                 }
+             }
+             
+             // save remaining records
+             if (!batch.isEmpty()) {
+                 historicalRepository.saveBatch(tableName, batch);
+                 totalSaved += batch.size();
+             }
 
                 // Update Tracker
                 tracker.setLastFetchedTimestamp(kiteData.get(kiteData.size() - 1).timeStamp);
@@ -124,19 +148,20 @@ public class HistoricalDataProcessor {
                 tracker.setLastRunAt(LocalDateTime.now());
                 trackerRepository.save(tracker);
                 
-                log.info("[SUCCESS] {} ({}): {} records saved to {}", symbol, interval, entities.size(), tableName);
-            
-        }  
+                log.info("[SUCCESS] {} ({}) saved {} records", symbol, interval, totalSaved);
+             }   
         
-        catch (Exception e) {
-            log.error(">>> [ERROR] {} ({}) {}", symbol, interval, e.getMessage(), e);
-            errorLog.setErrorCode(ErrorCodes.ERR01.getCode());
-            errorLog.setErrorMessage(ErrorCodes.ERR01.getMessage());
-            ActualFailureMessage(e.getMessage())
-            
-            throw e;
+        catch (KiteException ke) {
+        	String response = ke.getMessage();
+            logService.logKiteResponse(symbol,stock.getInstrumentToken(),fromDate,toDate,interval,ke.getMessage(),response);
+            logService.logError(ErrorCodes.ERR_KITE_API,ke.getMessage(),"Kite | " + symbol + " | " + interval);
+            throw ke;
         }
-    }
+       catch (Exception e) {
+                logService.logError(ErrorCodes.ERR_GENERIC, e.getMessage(),"Processor | " + symbol + " | " + interval);
+                throw e;
+            }
+        }
 
     private Date determineToDate() {
         LocalTime now = LocalTime.now();
@@ -192,14 +217,14 @@ public class HistoricalDataProcessor {
     }
     
 
-    private List<HistoricalData> mapToEntity(List<com.zerodhatech.models.HistoricalData> list, Stock stock) {
-        return list.stream().map(d -> HistoricalData.builder()
-                .id(stock.getInstrumentToken() + "_" + d.timeStamp)
-                .timeStamp(d.timeStamp)
-                .tradingSymbol(stock.getTradingSymbol())
-                .instrumentToken(stock.getInstrumentToken())
-                .open(d.open).high(d.high).low(d.low).close(d.close)
-                .volume(d.volume).oi(d.oi).build()
-        ).collect(Collectors.toList());  
-    }
+//    private List<HistoricalData> mapToEntity(List<com.zerodhatech.models.HistoricalData> list, Stock stock) {
+//        return list.stream().map(d -> HistoricalData.builder()
+//                .id(stock.getInstrumentToken() + "_" + d.timeStamp)
+//                .timeStamp(d.timeStamp)
+//                .tradingSymbol(stock.getTradingSymbol())
+//                .instrumentToken(stock.getInstrumentToken())
+//                .open(d.open).high(d.high).low(d.low).close(d.close)
+//                .volume(d.volume).oi(d.oi).build()
+//        ).collect(Collectors.toList());  
+//    }
 }

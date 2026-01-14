@@ -9,7 +9,6 @@ import com.zerodhatech.models.Instrument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.List;
@@ -47,6 +46,7 @@ public class StockService {
                                 .tradingSymbol(inst.getTradingsymbol())
                                 .exchange(inst.getExchange())
                                 .instrumentToken(inst.getInstrument_token())
+                                .lastPrice(inst.getLast_price())
                                 .build(),
                         (existing, replacement) -> {                           
                             return "NSE".equals(replacement.getExchange()) ? replacement : existing;

@@ -17,7 +17,9 @@ import com.CandleData.entity.stock.Stock;
 import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
 import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
 import com.CandleData.repository.stock.StockRepository;
+import com.CandleData.service.ErrorCodes;
 import com.CandleData.service.HistoricalData.HistoricalDataProcessor;
+import com.CandleData.service.Logs.LogService;
 import com.CandleData.service.kite.KiteService;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 
@@ -33,11 +35,14 @@ public class HistoricalDataScheduler {
     private final HistoricalDataRepository historicalRepository;
     private final KiteService kiteService;
     private final SyncTrackerRepository trackerRepository;
+    private final LogService logService;
     
     @Scheduled(cron = "0 30 15 * * MON-FRI")
     public void runDailySync() throws KiteException {
         if (!isTokenValid()) {           
             log.error("Kite token missing. Login required.");
+            logService.logError(
+                    ErrorCodes.ERR_KITE_TOKEN,"Access token is null","Scheduler start");
             return;
         }
 
@@ -57,12 +62,18 @@ public class HistoricalDataScheduler {
         for (String interval : intervals) {
             log.info("Processing Interval: [{}]", interval);
             String tableName = interval + "_HistoricalData_EQ_" + monthYear;
-            historicalRepository.createTableIfNotExist(tableName);
             
-            log.info("Interval [{}] started", interval);
-            List<SyncTracker> tracker = trackerRepository
-                    .findByInterval(interval);
+            try {
+                historicalRepository.createTableIfNotExist(tableName);
+            } catch (Exception e) {
+                logService.logError(ErrorCodes.ERR_DB_TABLE,
+                        e.getMessage(),"Create Table | " + tableName);
+                continue;
+            }
             
+            //log.info("Interval [{}] started", interval);
+            
+            List<SyncTracker> tracker = trackerRepository.findByInterval(interval);         
             Map<Long, SyncTracker> map = createTrackerMapfromList(tracker);
             
             for (int i = 0; i < stocks.size(); i++) {
@@ -72,13 +83,16 @@ public class HistoricalDataScheduler {
                     
                     processor.processStockData(stock, interval, tableName, map.get(stock.getInstrumentToken()));
                     Thread.sleep(350); 
+                    
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logService.logError(  ErrorCodes.ERR_THREAD_INTERRUPTED,
+                            ie.getMessage(),"Scheduler | " + stock.getTradingSymbol());
+                    
                 } catch (Exception e) {
-                	 log.error("Error processing stock [{}] | interval [{}] | token [{}]",
-                             stock.getTradingSymbol(),
-                             interval,
-                             stock.getInstrumentToken(),
-                             e
-                     );
+                    logService.logError( ErrorCodes.ERR_GENERIC,
+                            e.getMessage(),"Scheduler | symbol=" + stock.getTradingSymbol());
+
                 	 try {
                 	        SyncTracker failedTracker = map.get(stock.getInstrumentToken());
                 	        if (failedTracker != null) {
@@ -87,11 +101,12 @@ public class HistoricalDataScheduler {
                 	            trackerRepository.save(failedTracker);
                 	        }
                 	    } catch (Exception ex) {
-                	        log.error("Failed to update FAILED status for {}", stock.getTradingSymbol(), ex);
-                	    }
+                            logService.logError( ErrorCodes.ERR_DB_SAVE,
+                                    ex.getMessage(),"Updating FAILED tracker");
+                            }
+                      }
                 }
-            }
-        }
+          }
         log.info("Historical data sync completed at {}", new Date());
     }
     

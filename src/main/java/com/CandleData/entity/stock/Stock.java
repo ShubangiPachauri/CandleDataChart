@@ -22,4 +22,7 @@ public class Stock {
 
     @Column(name = "instrument_token")
     private Long instrumentToken;
+    
+    @Column(name = "last_price")
+    private Double lastPrice; 
 }
