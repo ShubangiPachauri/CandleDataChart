@@ -108,6 +108,7 @@ public class HistoricalDataScheduler {
                 }
           }
         log.info("Historical data sync completed at {}", new Date());
+        //Send Email to info@vittyaan.com
     }
     
     private Map<Long, SyncTracker> createTrackerMapfromList(List<SyncTracker> trackerList) {
