@@ -35,8 +35,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HistoricalDataProcessor {
 	
-	 private static final int DB_BATCH_SIZE = 5000;
-
     private final KiteService kiteService;
     private final HistoricalDataRepository historicalRepository;
     private final SyncTrackerRepository trackerRepository;
@@ -155,7 +153,7 @@ public class HistoricalDataProcessor {
         	String response = ke.getMessage();
             logService.logKiteResponse(symbol,stock.getInstrumentToken(),fromDate,toDate,interval,ke.getMessage(),response);
             logService.logError(ErrorCodes.ERR_KITE_API,ke.getMessage(),"Kite | " + symbol + " | " + interval);
-            throw ke;
+            //throw ke;
         }
        catch (Exception e) {
                 logService.logError(ErrorCodes.ERR_GENERIC, e.getMessage(),"Processor | " + symbol + " | " + interval);
@@ -165,7 +163,6 @@ public class HistoricalDataProcessor {
 
     private Date determineToDate() {
         LocalTime now = LocalTime.now();
-
         if (now.isBefore(LocalTime.of(15, 30))) {
             
             java.util.Calendar cal = java.util.Calendar.getInstance();
@@ -203,9 +200,9 @@ public class HistoricalDataProcessor {
         String start;
         interval = interval.toLowerCase();
         switch (interval) {
-        	case MINUTE -> start = LocalDate.now().minusDays(70) + MARKET_OPEN_TIME;
-            case FIVE_MINUTE -> start = LocalDate.now().minusDays(200) + MARKET_OPEN_TIME;
-            case FIFTEEN_MINUTE -> start = LocalDate.now().minusDays(250) + MARKET_OPEN_TIME;
+        	case MINUTE -> start = LocalDate.now().minusDays(60) + MARKET_OPEN_TIME;
+            case FIVE_MINUTE -> start = LocalDate.now().minusDays(100) + MARKET_OPEN_TIME;
+            case FIFTEEN_MINUTE -> start = LocalDate.now().minusDays(200) + MARKET_OPEN_TIME;
             case SIXTY_MINUTE-> start = LocalDate.now().minusDays(400) + MARKET_OPEN_TIME;
             case DAY -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;   
             case WEEK -> start = LocalDate.now().minusYears(5) + MARKET_OPEN_TIME;

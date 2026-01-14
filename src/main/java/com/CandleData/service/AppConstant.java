@@ -14,4 +14,6 @@ public class AppConstant {
 
     public static final String DAY  = "day";
     public static final String WEEK = "week";
+    
+    public static final int DB_BATCH_SIZE = 5000;
 }
