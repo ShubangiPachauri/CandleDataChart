@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .box { padding: 20px; border: 1px solid #ddd; border-radius: 6px; }
+        h2 { color: #2c3e50; }
+        .success { color: green; font-weight: bold; }
+        .warn { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h2>📊 Historical Data Sync Report</h2>
+
+    <p>Dear Team,</p>
+
+    <p>
+        This is to inform you that the scheduled historical market data
+        synchronization process has been <strong>successfully completed</strong>.
+        The data has been fetched, validated, and securely persisted for further
+        analysis and trading insights.
+    </p>
+
+    <p><strong>Date:</strong> {{DATE}}</p>
+    <p><strong>Process Start Time:</strong> {{START_TIME}}</p>
+    <p><strong>Process End Time:</strong> {{END_TIME}}</p>
+
+    <hr/>
+
+    <p><strong>Stocks Processed:</strong> {{STOCKS}}</p>
+    <p><strong>Intervals Covered:</strong> {{INTERVALS}}</p>
+
+    <p class="success">
+        ✔ Total Stocks Processed: {{TOTAL_STOCKS}}
+    </p>
+
+    <p class="warn">
+        ⚠ Failed Records (if any): {{FAILED_COUNT}}
+    </p>
+
+    <hr/>
+
+    <p>
+        The data has been securely stored and is now available for analytics,
+        backtesting, and trading insights.
+    </p>
+
+    <p>
+        If you notice any inconsistencies or missing data, please feel free to
+        reach out to the technical team.
+    </p>
+
+    <p>
+        Regards,<br/>
+        <strong>Vittyaan Financial Data Platform</strong>
+    </p>
+</div>
+</body>
+</html>

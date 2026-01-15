@@ -134,9 +134,5 @@ public class HistoricalDataProcessor {
                 logService.logError(ErrorCodes.ERR_GENERIC, e.getMessage(),"Processor | " + symbol + " | " + interval);
                 throw e;
             }
-        }
-
-
-    
-    
+        } 
 }
