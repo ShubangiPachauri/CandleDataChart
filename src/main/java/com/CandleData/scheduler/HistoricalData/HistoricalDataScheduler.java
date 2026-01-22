@@ -63,23 +63,11 @@ public class HistoricalDataScheduler {
                 .toList();
 
         String[] intervals = {MINUTE,"5minute", "15minute", "60minute", "day", "week"};
-        String monthYear = new SimpleDateFormat("MMM_yyyy").format(new Date()).toUpperCase();
+        //String monthYear = new SimpleDateFormat("MMM_yyyy").format(new Date()).toUpperCase();
 
         for (String interval : intervals) {
             log.info("Processing Interval: [{}]", interval);
-            String tableName = interval + "_HistoricalData_EQ_" + monthYear;
-            
-            try {
-                historicalRepository.createTableIfNotExist(tableName);
-            } catch (Exception e) {
-            	totalFailures++;
-                logService.logError(ErrorCodes.ERR_DB_TABLE,
-                        e.getMessage(),"Create Table | " + tableName);
-                continue;
-            }
-            
-            //log.info("Interval [{}] started", interval);
-            
+           
             List<SyncTracker> tracker = trackerRepository.findByInterval(interval);         
             Map<Long, SyncTracker> map = createTrackerMapfromList(tracker);
             
@@ -88,7 +76,7 @@ public class HistoricalDataScheduler {
                 try {
                     if (i % 50 == 0) log.info("Progress: {}/{} stocks done for {}", i, stocks.size(), interval);
                     
-                    processor.processStockData(stock, interval, tableName, map.get(stock.getInstrumentToken()));
+                    processor.processStockData(stock, interval, null, map.get(stock.getInstrumentToken()));
                     Thread.sleep(350); 
                     
                 } catch (InterruptedException ie) {

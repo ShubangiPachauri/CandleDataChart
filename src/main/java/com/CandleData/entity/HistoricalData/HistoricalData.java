@@ -7,7 +7,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class HistoricalData {
-    private String id; // format: instrumentToken_timeStamp
+    private String id;
     private String timeStamp;
     private String tradingSymbol;
     private Long instrumentToken;
