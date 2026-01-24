@@ -76,7 +76,7 @@ public class HistoricalDataScheduler {
                 try {
                     if (i % 50 == 0) log.info("Progress: {}/{} stocks done for {}", i, stocks.size(), interval);
                     
-                    processor.processStockData(stock, interval, null, map.get(stock.getInstrumentToken()));
+                    processor.processStockData(stock, interval, map.get(stock.getInstrumentToken()));
                     Thread.sleep(350); 
                     
                 } catch (InterruptedException ie) {

@@ -1,31 +1,21 @@
 package com.CandleData.service.HistoricalData;
 
-import static com.CandleData.service.AppConstant.DB_BATCH_SIZE;
-
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
-import java.util.*;
-
-import org.json.JSONException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.ObjectUtils;
-
 import com.CandleData.entity.HistoricalData.HistoricalData;
 import com.CandleData.entity.HistoricalData.SyncTracker;
 import com.CandleData.entity.stock.Stock;
 import com.CandleData.repository.HistoricalData.HistoricalDataRepository;
 import com.CandleData.repository.HistoricalData.SyncTrackerRepository;
-import com.CandleData.service.ErrorCodes;
-import com.CandleData.service.Logs.LogService;
 import com.CandleData.service.kite.KiteService;
 import com.CandleData.service.util.AppUtils;
-import com.CandleData.service.util.HistoricalTableNameUtil;
 import com.zerodhatech.kiteconnect.kitehttp.exceptions.KiteException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
+import java.util.List;
 
 @Service
 @Slf4j
@@ -35,157 +25,57 @@ public class HistoricalDataProcessor {
     private final KiteService kiteService;
     private final HistoricalDataRepository historicalRepository;
     private final SyncTrackerRepository trackerRepository;
-    private final LogService logService;
     private final AppUtils appUtils;
 
-    // ================= MAIN METHOD (SHORT) =================
     @Transactional
-    public void processStockData(Stock stock,String interval,String ignoredTableName,SyncTracker tracker)
-    		throws Exception, KiteException {
+    public void processStockData(Stock stock, String interval, SyncTracker tracker) throws Exception, KiteException {
+        //Initial Checks
+        if (stock == null) return;
+        SyncTracker currentTracker = (tracker != null) ? tracker : prepareNewTracker(stock, interval);
 
-        if (!isValidStock(stock)) return;
-
-        String symbol = stock.getTradingSymbol();
-        tracker = prepareTracker(stock, interval, tracker);
-
-        if (appUtils.isAlreadySyncedToday(tracker)) {
-            log.info("[SKIP] {} ({}) already synced for today.", symbol, interval);
+        if (appUtils.isAlreadySyncedToday(currentTracker)) {
+            log.info("[SKIP] {} ({}) already synced.", stock.getTradingSymbol(), interval);
             return;
         }
 
-        Date fromDate = appUtils.determineStartDate(tracker, interval);
-        Date toDate = normalizeDate(interval, appUtils.determineToDate());
+        // Date Setup
+        Date fromDate = appUtils.determineStartDate(currentTracker, interval);
+        Date toDate = appUtils.determineToDate();
+        if (fromDate.after(toDate)) return;
 
-        if (fromDate.after(toDate)) {
-            log.info("Invalid date range for {}", symbol);
-            return;
-        }
-
-        List<com.zerodhatech.models.HistoricalData> kiteData =
-                fetchKiteData(stock, interval, fromDate, toDate);
-
+        //Fetch Data
+        List<com.zerodhatech.models.HistoricalData> kiteData = fetchKiteData(stock, interval, fromDate, toDate);
         if (kiteData.isEmpty()) return;
 
-        int totalSaved = saveMonthWiseData(stock, interval, kiteData);
+        //Map & Save
+        List<HistoricalData> entities = kiteData.stream()
+                .map(d -> mapToEntity(stock, d))
+                .toList();
 
-        updateTracker(tracker, kiteData);
+        historicalRepository.saveBatch(interval, entities);
 
-        log.info("[SUCCESS] {} ({}) saved {} records", symbol, interval, totalSaved);
+        // Update Status
+        updateTracker(currentTracker, kiteData.get(kiteData.size() - 1).timeStamp);
+        log.info("[SUCCESS] {} ({}) - Records: {}", stock.getTradingSymbol(), interval, entities.size());
     }
 
-    // ================= VALIDATION =================
-    private boolean isValidStock(Stock stock) {
-        if (stock == null ||
-            stock.getInstrumentToken() == null ||
-            stock.getTradingSymbol() == null) {
-
-            logService.logError(ErrorCodes.ERR_VALIDATION,"Stock or Token is null","HistoricalDataProcessor");
-            return false;
-        }
-        return true;
+    private List<com.zerodhatech.models.HistoricalData> fetchKiteData(Stock stock, String interval, Date from, Date to) throws Exception, KiteException {
+        return kiteService.getKiteConnect()
+                .getHistoricalData(from, to, String.valueOf(stock.getInstrumentToken()), interval, false, true)
+                .dataArrayList;
     }
 
-    // ================= TRACKER =================
-    private SyncTracker prepareTracker(Stock stock, String interval, SyncTracker tracker) {
-
-        if (ObjectUtils.isEmpty(tracker)) {
-            return SyncTracker.builder()
-                    .tradingSymbol(stock.getTradingSymbol())
-                    .instrumentToken(stock.getInstrumentToken())
-                    .interval(interval)
-                    .build();
-        }
-        return tracker;
-    }
-
-    // ================= DATE NORMALIZE =================
-    private Date normalizeDate(String interval, Date date) throws Exception {
-        if ("day".equals(interval) || "week".equals(interval)) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            return sdf.parse(sdf.format(date));
-        }
-        return date;
-    }
-
-    // ================= KITE FETCH =================
-    private List<com.zerodhatech.models.HistoricalData> fetchKiteData(
-            Stock stock, String interval, Date from, Date to) throws KiteException, JSONException, IOException {
-
-        try {
-            List<com.zerodhatech.models.HistoricalData> data =
-                    kiteService.getKiteConnect()
-                            .getHistoricalData(from,to,String.valueOf(stock.getInstrumentToken()),interval,false,true)
-                            .dataArrayList;
-
-            if (data == null || data.isEmpty()) {
-                logService.logKiteResponse(stock.getTradingSymbol(),stock.getInstrumentToken(),from,to,interval,
-                		"Empty response from Kite","NO_DATA");        
-                return Collections.emptyList();
-            }
-            return data;
-
-        } catch (KiteException ke) {
-            logService.logKiteResponse(stock.getTradingSymbol(),stock.getInstrumentToken(),from,to,interval,
-                    ke.getMessage(),
-                    ke.getMessage());
-
-            logService.logError(ErrorCodes.ERR_KITE_API,ke.getMessage(),"Kite | " + stock.getTradingSymbol());
-            throw ke;
-        }
-    }
-
-    // ================= DB SAVE (MONTH + YEAR) =================
-    private int saveMonthWiseData(Stock stock,String interval,
-      List<com.zerodhatech.models.HistoricalData> kiteData) {
-      Map<String, List<HistoricalData>> tableWiseData = new HashMap<>();
-      
-        for (var d : kiteData) {
-            String tableName =
-                    HistoricalTableNameUtil.resolveTableName(interval, d.timeStamp);
-
-            tableWiseData
-                    .computeIfAbsent(tableName, k -> new ArrayList<>())
-                    .add(mapToEntity(stock, d));
-        }
-
-        int totalSaved = 0;
-
-        for (Map.Entry<String, List<HistoricalData>> entry : tableWiseData.entrySet()) {
-
-            String tableName = entry.getKey();
-            List<HistoricalData> records = entry.getValue();
-
-            historicalRepository.createTableIfNotExist(tableName);
-
-            List<HistoricalData> batch = new ArrayList<>(DB_BATCH_SIZE);
-
-            for (HistoricalData data : records) {
-                batch.add(data);
-
-                if (batch.size() >= DB_BATCH_SIZE) {
-                    historicalRepository.saveBatch(tableName, batch);
-                    totalSaved += batch.size();
-                    batch.clear();
-                }
-            }
-
-            if (!batch.isEmpty()) {
-                historicalRepository.saveBatch(tableName, batch);
-                totalSaved += batch.size();
-            }
-        }
-
-        return totalSaved;
-    }
-
-    // ================= ENTITY MAPPER =================
-    private HistoricalData mapToEntity(
-            Stock stock,
-            com.zerodhatech.models.HistoricalData d) {
+    private HistoricalData mapToEntity(Stock stock, com.zerodhatech.models.HistoricalData d) {
+        // 1. Kite format ko MySQL format mein convert karein
+        // Kite input: "2026-01-23T09:15:00+0530"
+        // MySQL output: "2026-01-23 09:15:00"
+        String mysqlTimestamp = d.timeStamp
+                .replace("T", " ")
+                .split("\\+")[0];
 
         return HistoricalData.builder()
-                .id(stock.getInstrumentToken() + "_" + d.timeStamp)
-                .timeStamp(d.timeStamp)
+                .id(stock.getInstrumentToken() + "_" + mysqlTimestamp) // Unique ID
+                .timeStamp(mysqlTimestamp) // Sahi date format
                 .tradingSymbol(stock.getTradingSymbol())
                 .instrumentToken(stock.getInstrumentToken())
                 .open(d.open)
@@ -197,16 +87,17 @@ public class HistoricalDataProcessor {
                 .build();
     }
 
-    // ================= TRACKER UPDATE =================
-    private void updateTracker(
-            SyncTracker tracker,
-            List<com.zerodhatech.models.HistoricalData> kiteData) {
+    private SyncTracker prepareNewTracker(Stock stock, String interval) {
+        return SyncTracker.builder()
+                .tradingSymbol(stock.getTradingSymbol())
+                .instrumentToken(stock.getInstrumentToken())
+                .interval(interval).build();
+    }
 
-        tracker.setLastFetchedTimestamp(
-                kiteData.get(kiteData.size() - 1).timeStamp);
+    private void updateTracker(SyncTracker tracker, String lastTime) {
+        tracker.setLastFetchedTimestamp(lastTime);
         tracker.setStatus("SUCCESS");
-        tracker.setLastRunAt(LocalDateTime.now());
-
+        tracker.setLastRunAt(java.time.LocalDateTime.now());
         trackerRepository.save(tracker);
     }
 }
