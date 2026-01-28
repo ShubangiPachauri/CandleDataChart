@@ -16,7 +16,7 @@ public class ErrorLog {
     private Long id;
 
     @Lob
-    @Column(name = "actual_message")
+    @Column(name = "actual_message", length = 1000000)
     private String actualMessage;
 
     @Column(name = "error_code")
@@ -26,7 +26,7 @@ public class ErrorLog {
     private String errorMessage;
 
     @Lob
-    @Column(name = "response")
+    @Column(name = "response", length = 1000000)
     private String response;
 
     private LocalDateTime createdAt;
