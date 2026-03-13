@@ -18,7 +18,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/kite/login",
                     "/api/access-token",
-                    "/api/stocks/sync",
+                    "/api/stocks/sync-nifty500",
                     "/api/historical/**" 
                 ).permitAll()
                 .anyRequest().authenticated()
