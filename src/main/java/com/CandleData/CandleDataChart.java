@@ -8,10 +8,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
-public class CandleDataHistoricalApplication {
+public class CandleDataChart{
 
 	public static void main(String[] args) {
-		SpringApplication.run(CandleDataHistoricalApplication.class, args);
+		SpringApplication.run(CandleDataChart.class, args);
 	}
 
 }

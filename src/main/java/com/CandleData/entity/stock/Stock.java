@@ -25,4 +25,7 @@ public class Stock {
     
     @Column(name = "last_price")
     private Double lastPrice; 
+    
+    @Column(name = "status")
+    private Integer status; // 1 = active, 0 = inactive
 }

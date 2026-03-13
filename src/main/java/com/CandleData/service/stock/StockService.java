@@ -29,7 +29,7 @@ public class StockService {
 
         log.info("Starting Nifty500 stock sync");
 
-        // 1️⃣ Download Nifty500 symbols
+        // Download Nifty500 symbols
         Set<String> nifty500Symbols =
                 nifty500DownloaderService.downloadNifty500Symbols();
 
@@ -37,12 +37,12 @@ public class StockService {
             throw new RuntimeException("Nifty500 symbols not downloaded");
         }
 
-        // 2️⃣ Kite instruments
+        // Kite instruments
         KiteConnect kiteConnect = kiteService.getKiteConnect();
 
         List<Instrument> instruments = kiteConnect.getInstruments("NSE");
 
-        // 3️⃣ Filter Nifty500 stocks
+        // Filter Nifty500 stocks
         List<Instrument> filtered = instruments.stream()
 
                 .filter(i -> "EQ".equals(i.getInstrument_type()))
@@ -57,7 +57,7 @@ public class StockService {
             throw new RuntimeException("No Nifty500 stocks found from instruments");
         }
 
-        // 4️⃣ Prepare LTP symbols
+        // Prepare LTP symbols
         List<String> ltpSymbols = filtered.stream()
                 .map(i -> "NSE:" + i.getTradingsymbol())
                 .collect(Collectors.toList());
@@ -78,8 +78,7 @@ public class StockService {
                 lastPrice = ltpData.get(ltpKey).lastPrice;
             }
 
-            Optional<Stock> existingStock = stockRepository.findByTradingSymbol(symbol);
-
+            Optional<Stock> existingStock = stockRepository.findByTradingSymbolAndStatus(symbol, 1);
             Stock stock;
 
             if (existingStock.isPresent()) {
@@ -89,6 +88,7 @@ public class StockService {
                 stock.setExchange(inst.getExchange());
                 stock.setInstrumentToken(inst.getInstrument_token());
                 stock.setLastPrice(lastPrice);
+                stock.setStatus(1);
 
             } else {
 
@@ -97,13 +97,27 @@ public class StockService {
                         .exchange(inst.getExchange())
                         .instrumentToken(inst.getInstrument_token())
                         .lastPrice(lastPrice)
+                        .status(1)
                         .build();
             }
 
             stocksToSave.add(stock);
         }
-
         stockRepository.saveAll(stocksToSave);
+        
+        // Jo stocks DB me hai but Nifty500 me nahi hai -> status = 0
+
+        List<Stock> allStocks = stockRepository.findAll();
+
+        for (Stock stock : allStocks) {
+
+            if (!nifty500Symbols.contains(stock.getTradingSymbol())) {
+
+                stock.setStatus(0);
+            }
+        }
+
+        stockRepository.saveAll(allStocks);
 
         log.info("Nifty500 stocks synced successfully. Total saved: {}", stocksToSave.size());
     }

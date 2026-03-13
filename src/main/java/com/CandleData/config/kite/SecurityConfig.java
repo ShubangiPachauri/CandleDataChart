@@ -19,6 +19,7 @@ public class SecurityConfig {
                     "/api/kite/login",
                     "/api/access-token",
                     "/api/stocks/sync-nifty500",
+                    "/api/indices/sync",
                     "/api/historical/**" 
                 ).permitAll()
                 .anyRequest().authenticated()
