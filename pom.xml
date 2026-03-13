@@ -8,10 +8,10 @@
 		<version>4.0.1</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.CandleData</groupId>
-	<artifactId>CandleData</artifactId>
+	<groupId>com.CandleDataChart</groupId>
+	<artifactId>CandleDataChart</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>CandleDataHistorical</name>
+	<name>CandleDataChart</name>
 	<description>Demo project for Spring Boot</description>
 	<url/>
 	<licenses>
