@@ -1,5 +1,7 @@
 package com.CandleData.entity.index;
 
+import com.CandleData.entity.MarketEntity;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -9,7 +11,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class IndexData {
+public class IndexData implements MarketEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,6 +20,8 @@ public class IndexData {
     private String indexName;
 
     private String tradingSymbol;
+    
+    private Long instrumentToken;
 
     private Double lastPrice;
 

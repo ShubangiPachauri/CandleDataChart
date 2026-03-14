@@ -1,4 +1,6 @@
 package com.CandleData.entity.stock;
+import com.CandleData.entity.MarketEntity;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -8,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Stock {
+public class Stock implements MarketEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

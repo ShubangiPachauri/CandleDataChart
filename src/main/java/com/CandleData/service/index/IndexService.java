@@ -31,53 +31,48 @@ public class IndexService {
     );
 
     public void syncTopIndices() throws Exception, KiteException {
-
         log.info("Starting Top Indices Sync");
-
         KiteConnect kiteConnect = kiteService.getKiteConnect();
 
-        Map<String, LTPQuote> ltpData =
-                kiteConnect.getLTP(INDEX_SYMBOLS.toArray(new String[0]));
+        // 1. Saare NSE instruments fetch karo (Kyuki symbols NSE ke hain)
+        List<Instrument> allInstruments = kiteConnect.getInstruments("NSE");
+        
+        // 2. LTP fetch karo (sirf price ke liye)
+        Map<String, LTPQuote> ltpData = kiteConnect.getLTP(INDEX_SYMBOLS.toArray(new String[0]));
 
         List<IndexData> saveList = new ArrayList<>();
 
-        for (String key : INDEX_SYMBOLS) {
+        for (String fullSymbol : INDEX_SYMBOLS) {
+            String cleanSymbol = fullSymbol.replace("NSE:", "");
+            
+            // 3. Master list mein se matching instrument dhoondo token nikaalne ke liye
+            Instrument match = allInstruments.stream()
+                    .filter(inst -> inst.tradingsymbol.equals(cleanSymbol))
+                    .findFirst()
+                    .orElse(null);
 
-            String symbol = key.replace("NSE:", "");
+            Optional<IndexData> existing = indexRepository.findByTradingSymbol(cleanSymbol);
+            IndexData index = existing.orElse(new IndexData());
 
-            double price = 0.0;
+            index.setTradingSymbol(cleanSymbol);
+            index.setIndexName(cleanSymbol);
+            index.setExchange("NSE");
+            index.setStatus(1);
 
-            if (ltpData.containsKey(key)) {
-                price = ltpData.get(key).lastPrice;
+            // Price update
+            if (ltpData.containsKey(fullSymbol)) {
+                index.setLastPrice(ltpData.get(fullSymbol).lastPrice);
             }
 
-            Optional<IndexData> existing =
-                    indexRepository.findByTradingSymbol(symbol);
-
-            IndexData index;
-
-            if (existing.isPresent()) {
-
-                index = existing.get();
-                index.setLastPrice(price);
-                index.setStatus(1);
-
-            } else {
-
-                index = IndexData.builder()
-                        .indexName(symbol)
-                        .tradingSymbol(symbol)
-                        .exchange("NSE")
-                        .lastPrice(price)
-                        .status(1)
-                        .build();
+            // Token update (Yahan se token milega)
+            if (match != null) {
+                index.setInstrumentToken(match.getInstrument_token());
             }
 
             saveList.add(index);
         }
 
         indexRepository.saveAll(saveList);
-
-        log.info("Indices synced successfully: {}", saveList.size());
+        log.info("Indices synced with tokens: {}", saveList.size());
     }
-}
+ }
