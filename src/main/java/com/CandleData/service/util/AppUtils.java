@@ -14,19 +14,39 @@ import com.CandleData.entity.HistoricalData.SyncTracker;
 @Service
 public class AppUtils {
 
-    @Value("${historical.sync.month}")
-    private String syncMonth;
+	 @Value("${historical.sync.range.minute}")
+	    private int minuteRange;
 
-    private static final SimpleDateFormat FORMAT =
-            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	    @Value("${historical.sync.range.5minute}")
+	    private int fiveMinuteRange;
 
-    public Date determineStartDate() {
+	    @Value("${historical.sync.range.default}")
+	    private int defaultRange;
 
-        YearMonth ym = YearMonth.parse(syncMonth);
+	    private static final SimpleDateFormat FORMAT =
+	            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	    
+    public Date determineStartDate(String interval) {
 
-        LocalDate firstDay = ym.atDay(1);
+        int days;
 
-        String start = firstDay + " 09:15:00";
+        switch (interval) {
+
+            case "minute":
+                days = minuteRange;
+                break;
+
+            case "5minute":
+                days = fiveMinuteRange;
+                break;
+
+            default:
+                days = defaultRange;
+        }
+
+        LocalDate startDate = LocalDate.now().minusDays(days);
+
+        String start = startDate + " 09:15:00";
 
         try {
             return FORMAT.parse(start);
@@ -35,13 +55,12 @@ public class AppUtils {
         }
     }
 
+
     public Date determineToDate() {
 
-        YearMonth ym = YearMonth.parse(syncMonth);
+        LocalDate today = LocalDate.now();
 
-        LocalDate lastDay = ym.atEndOfMonth();
-
-        String end = lastDay + " 15:30:00";
+        String end = today + " 15:30:00";
 
         try {
             return FORMAT.parse(end);

@@ -15,6 +15,22 @@ public class HistoricalDataRepository {
 
     @PersistenceContext
     private final EntityManager entityManager;
+    
+    @Transactional
+    public void deleteOldData(String interval, String tradingSymbol) {
+
+        String tableName = "`" + interval + "_historicaldata_eq`";
+
+        String sql = String.format(
+                "DELETE FROM %s WHERE trading_symbol = ?",
+                tableName
+        );
+
+        Query query = entityManager.createNativeQuery(sql);
+        query.setParameter(1, tradingSymbol);
+
+        query.executeUpdate();
+    }
 
     @Transactional
     public void saveBatch(String interval, List<HistoricalData> dataList) {

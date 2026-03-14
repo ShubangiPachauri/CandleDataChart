@@ -38,13 +38,18 @@ public class HistoricalDataProcessor {
             return;
         }
 
-        Date fromDate = appUtils.determineStartDate();
+        Date fromDate = appUtils.determineStartDate(interval);
         Date toDate = appUtils.determineToDate();
         if (fromDate.after(toDate)) return;
 
         //Fetch Data
         List<com.zerodhatech.models.HistoricalData> kiteData = fetchKiteData(stock, interval, fromDate, toDate);
         if (kiteData.isEmpty()) return;
+        
+        historicalRepository.deleteOldData(interval, stock.getTradingSymbol());
+
+        log.info("Old candles deleted for {} ({})", stock.getTradingSymbol(), interval);
+
 
         //Map & Save
         List<HistoricalData> entities = kiteData.stream()
